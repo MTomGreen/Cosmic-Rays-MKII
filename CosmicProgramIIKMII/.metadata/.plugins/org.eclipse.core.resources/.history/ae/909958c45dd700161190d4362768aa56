@@ -1,0 +1,16 @@
+package green.thread;
+
+import java.util.Random;
+
+public class LoadThread extends Thread{
+	
+	@Override
+	public void run() {
+		Random rand = new Random();
+		while(true){
+			rand.nextInt();
+			
+		}
+	}
+
+}

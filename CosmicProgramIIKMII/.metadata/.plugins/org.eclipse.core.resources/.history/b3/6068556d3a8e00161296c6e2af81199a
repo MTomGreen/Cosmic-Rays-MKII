@@ -1,0 +1,7 @@
+package green.ui.mainWindow.component;
+
+import javax.swing.JPanel;
+
+public class Overview extends JPanel {
+
+}

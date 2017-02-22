@@ -1,0 +1,135 @@
+package green.ui.mainWindow.component;
+
+import java.awt.Font;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JRadioButton;
+import javax.swing.SpringLayout;
+
+import com.github.lgooddatepicker.components.DatePicker;
+import com.github.lgooddatepicker.components.TimePicker;
+
+@SuppressWarnings("serial")
+public class Calculator extends JPanel{
+	private DatePicker startDate;
+	private TimePicker endTime;
+	private DatePicker endDate;
+	private TimePicker startTime;
+	public Calculator() {
+		SpringLayout springLayout = new SpringLayout();
+		setLayout(springLayout);
+		
+		JLabel lblCoincidenceCalculator = new JLabel("Coincidence Calculator");
+		lblCoincidenceCalculator.setFont(new Font("Tahoma", Font.PLAIN, 38));
+		springLayout.putConstraint(SpringLayout.NORTH, lblCoincidenceCalculator, 10, SpringLayout.NORTH, this);
+		springLayout.putConstraint(SpringLayout.WEST, lblCoincidenceCalculator, 10, SpringLayout.WEST, this);
+		add(lblCoincidenceCalculator);
+		
+		JLabel lblChjo = new JLabel("Select a way to enter data");
+		lblChjo.setFont(new Font("Tahoma", Font.PLAIN, 18));
+		springLayout.putConstraint(SpringLayout.NORTH, lblChjo, 29, SpringLayout.SOUTH, lblCoincidenceCalculator);
+		springLayout.putConstraint(SpringLayout.WEST, lblChjo, 0, SpringLayout.WEST, lblCoincidenceCalculator);
+		add(lblChjo);
+		
+		JRadioButton rdbtnGetCoincidencesFrom = new JRadioButton("Get coincidences from station IDs");
+		springLayout.putConstraint(SpringLayout.NORTH, rdbtnGetCoincidencesFrom, 9, SpringLayout.SOUTH, lblChjo);
+		springLayout.putConstraint(SpringLayout.WEST, rdbtnGetCoincidencesFrom, 10, SpringLayout.WEST, this);
+		add(rdbtnGetCoincidencesFrom);
+		
+		JRadioButton rdbtnGetCoincidencesFrom_1 = new JRadioButton("Get coincidences from cluster");
+		springLayout.putConstraint(SpringLayout.NORTH, rdbtnGetCoincidencesFrom_1, 6, SpringLayout.SOUTH, rdbtnGetCoincidencesFrom);
+		springLayout.putConstraint(SpringLayout.WEST, rdbtnGetCoincidencesFrom_1, 0, SpringLayout.WEST, lblCoincidenceCalculator);
+		add(rdbtnGetCoincidencesFrom_1);
+		
+		JRadioButton rdbtnGetCoincidencesFrom_2 = new JRadioButton("Get coincidences from coincidence file");
+		springLayout.putConstraint(SpringLayout.NORTH, rdbtnGetCoincidencesFrom_2, 6, SpringLayout.SOUTH, rdbtnGetCoincidencesFrom_1);
+		springLayout.putConstraint(SpringLayout.WEST, rdbtnGetCoincidencesFrom_2, 0, SpringLayout.WEST, lblCoincidenceCalculator);
+		add(rdbtnGetCoincidencesFrom_2);
+		
+		JRadioButton rdbtnGetCoincidencesFrom_3 = new JRadioButton("Get coincidences from all detectors");
+		springLayout.putConstraint(SpringLayout.NORTH, rdbtnGetCoincidencesFrom_3, 6, SpringLayout.SOUTH, rdbtnGetCoincidencesFrom_2);
+		springLayout.putConstraint(SpringLayout.WEST, rdbtnGetCoincidencesFrom_3, 0, SpringLayout.WEST, lblCoincidenceCalculator);
+		add(rdbtnGetCoincidencesFrom_3);
+		
+		JLabel lblSelectATimeframe = new JLabel("Select a time frame");
+		springLayout.putConstraint(SpringLayout.NORTH, lblSelectATimeframe, 172, SpringLayout.SOUTH, rdbtnGetCoincidencesFrom_3);
+		springLayout.putConstraint(SpringLayout.WEST, lblSelectATimeframe, 0, SpringLayout.WEST, lblCoincidenceCalculator);
+		lblSelectATimeframe.setFont(new Font("Tahoma", Font.PLAIN, 18));
+		add(lblSelectATimeframe);
+		
+		JLabel lblStart = new JLabel("Start");
+		springLayout.putConstraint(SpringLayout.NORTH, lblStart, 6, SpringLayout.SOUTH, lblSelectATimeframe);
+		springLayout.putConstraint(SpringLayout.WEST, lblStart, 0, SpringLayout.WEST, lblCoincidenceCalculator);
+		lblStart.setFont(new Font("Tahoma", Font.PLAIN, 15));
+		add(lblStart);
+		
+		startDate = new DatePicker();
+		springLayout.putConstraint(SpringLayout.NORTH, startDate, 483, SpringLayout.NORTH, this);
+		springLayout.putConstraint(SpringLayout.WEST, startDate, 0, SpringLayout.WEST, lblCoincidenceCalculator);
+		add(startDate);
+		
+		JLabel lblTime = new JLabel("Time");
+		springLayout.putConstraint(SpringLayout.NORTH, lblTime, 6, SpringLayout.SOUTH, startDate);
+		springLayout.putConstraint(SpringLayout.WEST, lblTime, 0, SpringLayout.WEST, lblCoincidenceCalculator);
+		add(lblTime);
+		
+		startTime = new TimePicker();
+		springLayout.putConstraint(SpringLayout.NORTH, startTime, 6, SpringLayout.SOUTH, lblTime);
+		springLayout.putConstraint(SpringLayout.WEST, startTime, 0, SpringLayout.WEST, lblCoincidenceCalculator);
+		add(startTime);
+		
+		JLabel lblFinish = new JLabel("Finish");
+		springLayout.putConstraint(SpringLayout.NORTH, lblFinish, 6, SpringLayout.SOUTH, lblSelectATimeframe);
+		lblFinish.setFont(new Font("Tahoma", Font.PLAIN, 15));
+		add(lblFinish);
+		
+		JLabel lblDate = new JLabel("Date");
+		springLayout.putConstraint(SpringLayout.WEST, lblFinish, 0, SpringLayout.WEST, lblDate);
+		add(lblDate);
+		
+		endDate = new DatePicker();
+		springLayout.putConstraint(SpringLayout.WEST, lblDate, 0, SpringLayout.WEST, endDate);
+		springLayout.putConstraint(SpringLayout.SOUTH, lblDate, -6, SpringLayout.NORTH, endDate);
+		springLayout.putConstraint(SpringLayout.NORTH, endDate, 0, SpringLayout.NORTH, startDate);
+		springLayout.putConstraint(SpringLayout.WEST, endDate, 64, SpringLayout.EAST, startDate);
+		add(endDate);
+		
+		JLabel lblTime_1 = new JLabel("Time");
+		springLayout.putConstraint(SpringLayout.NORTH, lblTime_1, 0, SpringLayout.NORTH, lblTime);
+		springLayout.putConstraint(SpringLayout.WEST, lblTime_1, 0, SpringLayout.WEST, lblFinish);
+		add(lblTime_1);
+		
+		endTime = new TimePicker();
+		springLayout.putConstraint(SpringLayout.NORTH, endTime, 0, SpringLayout.NORTH, startTime);
+		springLayout.putConstraint(SpringLayout.WEST, endTime, 0, SpringLayout.WEST, lblFinish);
+		add(endTime);
+		
+		JLabel label = new JLabel("Date");
+		springLayout.putConstraint(SpringLayout.NORTH, label, 0, SpringLayout.NORTH, lblDate);
+		springLayout.putConstraint(SpringLayout.WEST, label, 0, SpringLayout.WEST, lblCoincidenceCalculator);
+		add(label);
+		
+		JButton btnTest = new JButton("Test");
+		springLayout.putConstraint(SpringLayout.NORTH, btnTest, 35, SpringLayout.SOUTH, startTime);
+		springLayout.putConstraint(SpringLayout.WEST, btnTest, 0, SpringLayout.WEST, lblCoincidenceCalculator);
+		btnTest.addActionListener(new ActionListener(){
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				springLayout.putConstraint(SpringLayout.NORTH, btnTest, 6, SpringLayout.SOUTH, rdbtnGetCoincidencesFrom_3);
+				springLayout.putConstraint(SpringLayout.WEST, btnTest, 0, SpringLayout.WEST, lblCoincidenceCalculator);
+			}
+		});
+		add(btnTest);
+		
+		JButton btnTo = new JButton("Test2");
+		springLayout.putConstraint(SpringLayout.NORTH, btnTo, 6, SpringLayout.SOUTH, rdbtnGetCoincidencesFrom_3);
+		springLayout.putConstraint(SpringLayout.WEST, btnTo, 0, SpringLayout.WEST, lblCoincidenceCalculator);
+		add(btnTo);
+		
+		
+	}
+}

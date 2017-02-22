@@ -1,0 +1,240 @@
+package green.util;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+
+import green.object.Coincidence;
+import green.object.CoincidenceReceiver;
+import green.object.Detector;
+import green.thread.GUIThread;
+
+public class Maths {
+	
+	public static HashMap<String, Object> getAnglesFor(Coincidence c) {
+
+		HashMap<String, Object> data = new HashMap<String, Object>();
+
+		String[] lineA = c.rawData.get(0).split("\t");
+		String[] lineB = c.rawData.get(1).split("\t");
+		String[] lineC = c.rawData.get(2).split("\t");
+		
+		String timeString = lineA[3];
+		String dateString = lineA[2];
+		
+
+		data.put("rawA", c.rawData.get(0));
+		data.put("rawB", c.rawData.get(1));
+		data.put("rawC", c.rawData.get(2));
+		
+
+		Detector detectorA = InfoUtils.getDetectorForID(Integer.parseInt(lineA[1]));
+		Detector detectorB = InfoUtils.getDetectorForID(Integer.parseInt(lineB[1]));
+		Detector detectorC = InfoUtils.getDetectorForID(Integer.parseInt(lineC[1]));
+
+		// All occur at the same time and date.
+		String TimeDate = lineA[2] + "\t" + lineA[3];
+		data.put("timeDate", TimeDate);
+		
+		
+		double Ta = Double.parseDouble(lineA[5]);
+		double Tb = Double.parseDouble(lineB[5]) - Ta;
+		double Tc = Double.parseDouble(lineC[5]) - Ta;
+
+		data.put("Ta", Ta);
+		data.put("Tb", Tb);
+		data.put("Tc", Tc);
+
+		double[] ACoords = Coord.geo_to_ecef(detectorA.latitudeRadians(), detectorA.longitudeRadians(),
+				detectorA.getAltitude());
+		double[] BCoords = Coord.geo_to_ecef(detectorB.latitudeRadians(), detectorB.longitudeRadians(),
+				detectorB.getAltitude());
+		double[] CCoords = Coord.geo_to_ecef(detectorC.latitudeRadians(), detectorC.longitudeRadians(),
+				detectorC.getAltitude());
+
+		// Console.log(ACoords[0] + " " + ACoords[1] + " " + ACoords[2]);
+
+		data.put("coordsA", ACoords);
+		data.put("coordsB", BCoords);
+		data.put("coordsC", CCoords);
+
+		// Console.log(detectorB.getLatitude() + ", " +
+		// detectorB.getLongitude());
+
+		double Bx = BCoords[0] - ACoords[0];
+		double Cx = CCoords[0] - ACoords[0];
+		double By = BCoords[1] - ACoords[1];
+		double Cy = CCoords[1] - ACoords[1];
+		double Bz = BCoords[2] - ACoords[2];
+		double Cz = CCoords[2] - ACoords[2];
+
+		double U, V;
+
+		// Line 91
+		if (Math.abs(Tb * Cy - Tc * By) > 1.E-50) {
+			// Console.log("Calculating U and V");
+			U = (Tc * Bz - Tb * Cz) / (Tb * Cy - Tc * By);
+			V = (Tc * Bx - Tb * Cx) / (Tb * Cy - Tc * By);
+		} else {
+			// Console.log("Overriding U and V");
+			U = 0.0;
+			V = 1.0;
+		}
+
+		data.put("U", U);
+		data.put("V", V);
+		// Console.log("U: " + U + " V: " + V);
+
+		double R1;
+		double R2;
+
+		double A, B, C = 0;
+
+		if (Math.abs(Tc) < 1.E-30 && Math.abs(Tb) < 1.E-30) {
+			// Console.log("R was set to 0.0");
+			R1 = 0;
+			R2 = 0;
+		} else {
+
+			if (Math.abs(Tc) > Math.abs(Tb)) {
+				// Console.log("Using equation set A for A, B and C");
+				A = 1.0 + U * U - (Cz + U * Cy) * (Cz + U * Cy) / (Tc * Tc);
+				B = 2.0 * U * V - 2.0 * (U * V * Cy * Cy + V * Cy * Cz + U * Cx * Cy + Cx * Cz) / (Tc * Tc);
+				C = V * V + 1 - (V * Cy + Cx) * (V * Cy + Cx) / (Tc * Tc);
+			}
+
+			else {
+				// Console.log("Using equation set B for A, B and C");
+				A = 1.0 + U * U - (Bz + U * By) * (Bz + U * By) / (Tb * Tb);
+				B = 2.0 * U * V - 2.0 * (U * V * By * By + V * By * Bz + U * Bx * By + Bx * Bz) / (Tb * Tb);
+				C = V * V + 1 - (V * By + Bx) * (V * By + Bx) / (Tb * Tb);
+			}
+
+			// Console.log("A: " + A + " B: " + B + " C: " + C);
+
+			R1 = (-B + Math.sqrt(B * B - 4 * A * C)) / (2 * A);
+			R2 = (-B - Math.sqrt(B * B - 4 * A * C)) / (2 * A);
+
+			// Console.log("R1: " + R1 + " R2: " + R2);
+		}
+
+		data.put("R1", R1);
+		data.put("R2", R2);
+
+		double Q1 = R1 * U + V;
+		double Q2 = R2 * U + V;
+
+		data.put("Q1", Q1);
+		data.put("Q2", Q2);
+
+		// Console.log("Q1: " + Q1 + " Q2: " + Q2);
+
+		double theta1 = Math.toDegrees(Math.atan(Q1));
+		double theta2 = Math.toDegrees(Math.atan(Q2));
+
+		double phi1 = Math.toDegrees(Math.acos(R1 / Math.sqrt(1 + Q1 * Q1 + R1 * R1)));
+		double phi2 = Math.toDegrees(Math.acos(R2 / Math.sqrt(1 + Q2 * Q2 + R2 * R2)));
+
+		// Theta -> Azimuth
+		// Phi -> Declination, or Zenith
+
+		double azimuth;
+		double zenith;
+
+		if (phi1 > 1 && phi1 != Double.NaN) {
+			azimuth = theta1;
+			zenith = phi1;
+		} else {
+			azimuth = theta2;
+			zenith = phi2;
+		}
+		
+		String time  = TimeDate.split("\t")[1]; //Returns hh:mm:ss
+		String[] times = time.split(":");  //Split into hh, mm and ss
+//		double hours = Double.parseDouble(times[1]);
+//		hours += Double.parseDouble(times[1])/60;
+//		hours += Double.parseDouble(times[2])/3600;
+		double rAscension = rAngleToRightAscension(detectorA, azimuth, zenith, timeString, dateString);
+
+		data.put("azimuth", azimuth);
+		data.put("zenith", zenith);
+		data.put("ascension", rAscension);
+
+		// Console.log(lineA[5] + ", " + lineB[5] + ", " + lineC[5]);
+		// Console.log(azimuth + " " + zenith);
+
+		return data;
+	}
+	
+	public static void getAngles(ArrayList<Detector> stations, String start, String end, CoincidenceReceiver sendTo) {
+		ArrayList<HashMap<String, Object>> returns = new ArrayList<HashMap<String, Object>>();
+
+		for (Coincidence con : InfoUtils.getCoincidences(stations, null, start, end, (int) InfoUtils.getConfigValueOf("defNoStrikes", 3))) {
+			returns.add(getAnglesFor(con));
+		}
+
+		sendTo.receiveCoincidences(returns);
+		GUIThread.window.repaint();
+	}
+	
+	public static double getRightAscension(double rAngle, long time){
+		
+		
+		
+		
+		return 0;
+	}
+	
+	public static double getGreenwichSiderealTime(String date, String time){
+		//date takes the form YYYY-MM-DD
+		//time takes the form HH:MM:SS
+		String[] dateParts = date.split("-");
+		String[] timeParts = time.split(":");
+		
+		int year = Integer.parseInt(dateParts[0]);
+		int month = Integer.parseInt(dateParts[1]);
+		int day = Integer.parseInt(dateParts[2]);
+		
+		double a = (14-month / 12d);
+		double A = ((year-a)/100d);
+		double B = 2-A + (A/4d);
+		double C = (365.25*(year-a));
+		double D = (30.6001*(month + (12*a) + 1));
+		double JD = B + C + D + day + (0/24) + 1720994.5;
+		
+		System.out.println("Julian Date: " + JD);
+		
+		int hours = Integer.parseInt(timeParts[0]);
+		int minutes = Integer.parseInt(timeParts[1]);
+		int seconds = Integer.parseInt(timeParts[2]);
+		
+		double UT = hours + ((double)minutes/60d) + ((double)seconds/(60d*60d));
+		
+		double T = (JD-2451545.0)/36525.0;
+		
+		double To = 6.697374558+ (2400.051336*T)+(0.000025862*(T*T))+(UT*1.0027379093);
+		
+		double GST = To%24;
+		
+		System.out.println("GMT: " + UT);
+		System.out.println("GST: " + GST);
+		
+		return GST;
+		
+	}
+	
+	public static double rAngleToRightAscension(Detector d, double rAngle, double declination, String time, String date){
+		rAngle = Math.toRadians(rAngle);
+		declination = Math.toRadians(declination);
+		
+		double LST = getGreenwichSiderealTime(date, time) + (d.getLongitude()/15d);
+		double a = Math.toRadians(90) - declination;
+		double A = Math.toRadians(270) -rAngle;
+		double S = Math.asin((Math.sin(a)*Math.sin(rAngle))+(Math.cos(a)*Math.cos(rAngle)*Math.cos(A)));
+		//Where S represents δ
+		double HA = Math.acos((Math.sin(a)-(Math.sin(rAngle)*Math.sin(S)))/(Math.cos(rAngle)*Math.cos(S)));
+		double x = LST - Math.toDegrees(HA);
+		
+		return Math.toDegrees(x);
+	}
+
+}

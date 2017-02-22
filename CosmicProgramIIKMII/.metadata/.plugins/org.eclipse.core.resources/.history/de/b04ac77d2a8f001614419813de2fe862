@@ -1,0 +1,590 @@
+package green.util;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.URL;
+import java.net.URLConnection;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+import green.event.DetectorLoadedEvent;
+import green.event.EventHub;
+import green.object.Coincidence;
+import green.object.CoincidenceReceiver;
+import green.object.Console;
+import green.object.Detector;
+
+/**
+ * @author green Performs the tasks of WebUtils, FileUtils and Config.
+ */
+public class InfoUtils {
+
+	public static ArrayList<Detector> detectors;
+
+	// Web Util Data
+	private static String baseURL = "http://data.hisparc.nl/api";
+	private static String statusURL = "http://data.hisparc.nl/show/stations_by_country/";
+
+	// FIle data
+	private static String baseDir = new File("").getAbsolutePath() + "\\data";
+	private static File stationsFile;
+	private static File configFile;
+	private static String configDir = "\\config.cfg";
+	private static File stationsDir = new File(baseDir + "\\stations\\");
+
+	private static HashMap<String, Object> config = new HashMap<String, Object>();
+
+	public static void loadEssentials() {
+		loadDetectors();
+		loadExtra();
+	}
+
+	// Loads detectors and their IDs from a file. If the file is not present it
+	// will download them.
+	// Once loaded, it downloads the same information in a new thread.
+	// Downloading takes approximately 160 milliseconds, whereas loading the
+	// file takes 4.
+	static boolean stationsFileExists = false;
+
+	public static void loadDetectors() {
+		stationsFile = new File(baseDir);
+		if (!stationsFile.exists()) {
+			stationsFile.mkdirs();
+		}
+
+		if (detectors == null)
+			detectors = new ArrayList<Detector>();
+		stationsFile = new File(baseDir + "\\stations.dat");
+		if (stationsFile.exists())
+			stationsFileExists = true;
+		ArrayList<String> lines = new ArrayList<String>();
+		if (stationsFileExists) {
+			try {
+				BufferedReader reader = new BufferedReader(new FileReader(stationsFile));
+				String line = null;
+				while ((line = reader.readLine()) != null) {
+					lines.add(line);
+				}
+				reader.close();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			for (String line : lines) {
+				String[] parts = line.split("\t");
+				Detector d = new Detector(Integer.parseInt(parts[0]), parts[1], Integer.parseInt(parts[0]));
+				if(d != null)
+				detectors.add(d);
+			}
+		}
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				downloadDetectors();
+			}
+		}).start(); 
+		//loadExtra();
+	}
+
+	// Grabs a list of detectors from the HiSPARC website and overwrites the
+	// current detectors with it.
+	static ArrayList<String> statusData;
+
+	private static void downloadDetectors() {
+		statusData = new ArrayList<String>();
+		String line = null;
+		boolean hasInternet = true;
+		try {
+			URL url = new URL(baseURL + "/stations");
+			URLConnection con = url.openConnection();
+			BufferedReader br = new BufferedReader(new InputStreamReader(con.getInputStream()));
+			URL statURL = new URL(statusURL);
+			URLConnection statCon = statURL.openConnection();
+			BufferedReader statReader = new BufferedReader(new InputStreamReader(statCon.getInputStream()));
+			String statLine;
+			while ((statLine = statReader.readLine()) != null)
+				statusData.add(statLine);
+			line = br.readLine();
+			br.close();
+		} catch (Exception e) {
+			Console.logError("Failed to connect to the internet! Program will use Cached data if available.");
+			hasInternet = false;
+			if (!stationsFileExists) {
+				Console.logError("Could not load data from cache or the internet! Program will exit.");
+				System.exit(1);
+			}
+		}
+		try {
+			if (hasInternet) {
+				ArrayList<Detector> freshDetectors = new ArrayList<Detector>();
+				JsonParser parser = new JsonParser();
+				JsonArray array = (JsonArray) parser.parse(line);
+				for (int i = 0; i < array.size(); i++) {
+					JsonObject object = (JsonObject) array.get(i);
+					String name = object.get("name").getAsString();
+					int number = object.get("number").getAsInt();
+					Detector d = new Detector(number, name, getStatus(number));
+					freshDetectors.add(d);
+				}
+				detectors = freshDetectors;
+				EventHub.fireEvent(new DetectorLoadedEvent());
+
+				FileWriter writer = new FileWriter(stationsFile);
+				for (Detector d : detectors) {
+					writer.write(d.getId() + "\t" + d.getName() + "\t" + getStatus(d.getId()) + "\r\n");
+				}
+				writer.flush();
+				writer.close();
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public static int getStatus(int stationID) {
+		Iterator<String> iter = statusData.iterator();
+		while (iter.hasNext()) {
+			String line = iter.next();
+			if (line.contains("/show/stations/" + stationID + "/status")) {
+				if (line.contains("down"))
+					return 0;
+				if (line.contains("unknown"))
+					return 1;
+				if (line.contains("problem"))
+					return 2;
+				if (line.contains("up"))
+					return 3;
+			}
+			if (!line.contains("statusBall"))
+				iter.remove();
+		}
+		return 0;
+	}
+
+	@SuppressWarnings("unchecked")
+	public static void loadConfig() {
+		configFile = new File(baseDir + configDir);
+		try {
+			if (configFile.exists()) {
+				ObjectInputStream ois = new ObjectInputStream(new FileInputStream(configFile));
+				config = (HashMap<String, Object>) ois.readObject();
+				ois.close();
+			} else
+				config = new HashMap<String, Object>();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public static Object getConfigValueOf(String key, Object defaultValue) {
+		if (config == null)
+			loadConfig();
+		if (config.containsKey(key))
+			return config.get(key);
+		else {
+			config.put(key, defaultValue);
+			return defaultValue;
+		}
+	}
+
+	public static void saveConfig() {
+		configFile = new File(baseDir + configDir);
+		try {
+			ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(configFile));
+			out.writeObject(config);
+			out.flush();
+			out.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public static void setConfigValue(String key, Object value) {
+		config.put(key, value);
+	}
+
+	public static String getNameForID(int id) {
+		for (Detector d : detectors)
+			if (d.getId() == id)
+				return d.getName();
+		return "Station not found";
+	}
+
+	public static Detector getDetectorFromNameOrID(String name, String ID) {
+		int id;
+		try {
+			id = Integer.parseInt(ID);
+			return getDetectorForID(id);
+		} catch (Exception e) {
+			for (Detector d : detectors) {
+				if (d.getName().toLowerCase().equals(name.toLowerCase()))
+					return d;
+			}
+			String[] parts = name.split(" ");
+			for (Detector d : detectors) {
+				for (String piece : parts)
+					if (d.getName().contains(piece) && !piece.equals(""))
+						return d;
+			}
+		}
+		return null;
+	}
+
+	public static Detector getDetectorForID(int id) {
+		for (Detector d : detectors)
+			if (d.getId() == id)
+				return d;
+		return null;
+	}
+
+	public static void getAngles(ArrayList<Detector> stations, String start, String end, CoincidenceReceiver sendTo) {
+		ArrayList<HashMap<String, Object>> returns = new ArrayList<HashMap<String, Object>>();
+
+		for (Coincidence con : getCoincidences(stations, null, start, end,
+				(int) InfoUtils.getConfigValueOf("defNoStrikes", 3))) {
+			returns.add(getAnglesFor(con));
+		}
+
+		sendTo.receiveCoincidences(returns);
+
+	}
+
+	public static ArrayList<Coincidence> getCoincidences(ArrayList<Detector> detectors, String cluster, String start,
+			String finish, int minStrikes) {
+		String base = "http://data.hisparc.nl/data/network/coincidences/?end=%s&start=%s&stations=%s&n=%s&cluster=%s&download=False";
+		String complete = null;
+		ArrayList<Coincidence> cons = new ArrayList<Coincidence>();
+		if (detectors != null) { // Download data by ID
+			StringBuilder stations = new StringBuilder();
+			for (Detector d : detectors) {
+				stations.append(d.getId());
+				stations.append(",");
+			}
+			stations.replace(stations.length() - 1, stations.length(), "");
+			complete = String.format(base, finish, start, stations, minStrikes, "None");
+		}
+
+		if (cluster != null) { // Download by cluster
+
+		}
+
+		else { // Download all
+
+		}
+		Console.log("Downloading");
+		ArrayList<String> dataLines = new ArrayList<String>();
+		try {
+			URL url = new URL(complete);
+			URLConnection con = url.openConnection();
+			InputStream input = con.getInputStream();
+			BufferedReader reader = new BufferedReader(new InputStreamReader(input));
+			String line;
+			Console.log("Data downloaded");
+			while ((line = reader.readLine()) != null) {
+				if (!line.contains("#")) {
+					dataLines.add(line);
+					//Console.log(line);
+				}
+			}
+		} catch (Exception ex) {
+			Console.log("Couldn't load coincidence!");
+			ex.printStackTrace();
+		}
+		Console.log("Making coincidences");
+		int numEvents = 0;
+		if(dataLines.size() >= 1){
+		numEvents = Integer.parseInt(dataLines.get(dataLines.size() - 1).split("\t")[0]);
+		// Console.log(numEvents);
+		}
+
+		for (int i = 0; i < numEvents + 1; i++) {
+			cons.add(new Coincidence(i));
+		}
+
+		for (String line : dataLines) {
+			String[] parts = line.split("\t");
+			int id = Integer.parseInt(parts[0]);
+			cons.get(id).rawData.add(line);
+		}
+		Console.log("Done making coincidences");
+		return cons;
+	}
+
+	public static HashMap<String, Object> getAnglesFor(Coincidence c) {
+		
+		HashMap<String, Object> data = new HashMap<String, Object>();
+		
+		String[] lineA = c.rawData.get(0).split("\t");
+		String[] lineB = c.rawData.get(1).split("\t");
+		String[] lineC = c.rawData.get(2).split("\t");
+		
+		data.put("rawA", c.rawData.get(0));
+		data.put("rawB", c.rawData.get(1));
+		data.put("rawC", c.rawData.get(2));
+		
+
+		Detector detectorA = getDetectorForID(Integer.parseInt(lineA[1]));
+		Detector detectorB = getDetectorForID(Integer.parseInt(lineB[1]));
+		Detector detectorC = getDetectorForID(Integer.parseInt(lineC[1]));
+		
+
+		// All occur at the same time and date.
+		String TimeDate = lineA[2] + "\t" + lineA[3];
+		data.put("timeDate", TimeDate);
+		
+		double Ta = Double.parseDouble(lineA[5]);
+		double Tb = Double.parseDouble(lineB[5]) - Ta;
+		double Tc = Double.parseDouble(lineC[5]) - Ta;
+		
+		data.put("Ta", Ta);
+		data.put("Tb", Tb);
+		data.put("Tc", Tc);
+		
+		double[] ACoords = Coord.geo_to_ecef(detectorA.latitudeRadians(), detectorA.longitudeRadians(), detectorA.getAltitude());
+		double[] BCoords = Coord.geo_to_ecef(detectorB.latitudeRadians(), detectorB.longitudeRadians(), detectorB.getAltitude());
+		double[] CCoords = Coord.geo_to_ecef(detectorC.latitudeRadians(), detectorC.longitudeRadians(), detectorC.getAltitude());
+		
+		//System.out.println(ACoords[0] + " " + ACoords[1] + " " + ACoords[2]);
+		
+		data.put("coordsA", ACoords);
+		data.put("coordsB", BCoords);
+		data.put("coordsC", CCoords);
+		
+		//System.out.println(detectorB.getLatitude() + ", " + detectorB.getLongitude());
+		
+		double Bx = BCoords[0]-ACoords[0]; double Cx = CCoords[0]-ACoords[0];
+		double By = BCoords[1]-ACoords[1]; double Cy = CCoords[1]-ACoords[1];
+		double Bz = BCoords[2]-ACoords[2]; double Cz = CCoords[2]-ACoords[2];
+		
+		double U, V;
+		
+		//Line 91
+		if(Math.abs(Tb*Cy - Tc*By) > 1.E-50){
+			//System.out.println("Calculating U and V");
+			U = (Tc*Bz - Tb*Cz) / ( Tb*Cy - Tc*By);
+			V = (Tc*Bx - Tb*Cx) / ( Tb*Cy - Tc*By );
+		}
+		else{
+			//System.out.println("Overriding U and V");
+			U = 0.0;
+			V = 1.0;
+		}
+		
+		data.put("U", U);
+		data.put("V", V);
+	//System.out.println("U: " + U + " V: " + V);
+		
+		double R1;
+		double R2;
+		
+		double A,B,C = 0;
+		
+		if (Math.abs(Tc) < 1.E-30 && Math.abs(Tb) < 1.E-30){
+			//System.out.println("R was set to 0.0");
+			R1 = 0;
+			R2 = 0;
+		}
+		else{
+			
+			if(Math.abs(Tc) > Math.abs(Tb)){
+				//System.out.println("Using equation set A for A, B and C");
+	            A = 1.0 + U*U - (Cz + U*Cy)*(Cz + U*Cy)/(Tc*Tc);
+	            B = 2.0*U*V   - 2.0*(U*V*Cy*Cy + V*Cy*Cz+ U*Cx*Cy + Cx*Cz )/(Tc*Tc);
+	            C = V*V + 1   - (V*Cy+Cx)*(V*Cy+Cx)/(Tc*Tc);
+			}
+			
+			else{
+			//	System.out.println("Using equation set B for A, B and C");
+	            A = 1.0 + U*U - (Bz + U*By)*(Bz + U*By)/(Tb*Tb);
+	            B = 2.0*U*V   - 2.0*(U*V*By*By + V*By*Bz + U*Bx*By + Bx*Bz )/(Tb*Tb);
+	            C = V*V + 1   - (V*By+Bx)*(V*By+Bx)/(Tb*Tb);  
+			}
+			
+			
+			//System.out.println("A: " + A + " B: " + B + " C: " + C);
+			
+			
+			R1 = (-B + Math.sqrt(B*B - 4*A*C))/(2*A);
+			R2 = (-B - Math.sqrt(B*B - 4*A*C))/(2*A);
+			
+			//System.out.println("R1: " + R1 + " R2: " + R2);
+		}
+		
+		data.put("R1", R1);
+		data.put("R2", R2);
+		
+
+		
+		double Q1 = R1 * U + V;
+		double Q2 = R2 * U + V;
+		
+		data.put("Q1", Q1);
+		data.put("Q2", Q2);
+		
+		//System.out.println("Q1: " + Q1 + " Q2: " + Q2);
+		
+		double theta1 = Math.toDegrees(Math.atan(Q1));
+		double theta2 = Math.toDegrees(Math.atan(Q2));
+		
+	    double phi1 = Math.toDegrees(Math.acos(R1/Math.sqrt(1 + Q1*Q1 + R1*R1)));	
+	    double phi2 = Math.toDegrees(Math.acos(R2/Math.sqrt(1 + Q2*Q2 + R2*R2)));
+		
+		//Theta -> Azimuth
+	    //Phi -> Declination, or Zenith
+	    
+	    double azimuth;
+	    double zenith;
+	    
+	    
+	    if(phi1 > 1 && phi1 != Double.NaN){
+	    	azimuth = theta1;
+	    	zenith = phi1;
+	    }
+	    else {
+	    	azimuth = theta2;
+	    	zenith = phi2;
+	    }
+	    
+	    data.put("azimuth", azimuth);
+	    data.put("zenith", zenith);
+	    
+	   // Console.log(lineA[5] + ", " + lineB[5] + ", " + lineC[5]);
+	    //Console.log(azimuth + " " + zenith);
+		
+		
+		
+		return data;
+	}
+
+	/**
+	 * Loads position, status(incorrect) and status(incorrect) to the detector.
+	 */
+	public static void setDetectorInfo(Detector d) {
+		String info = null;
+		try{
+			URL url = new URL(baseURL + "/station/" + d.getId());
+			URLConnection con = url.openConnection();
+			InputStream input = con.getInputStream();
+			InputStreamReader streamReader = new InputStreamReader(input);
+			BufferedReader reader = new BufferedReader(streamReader);
+			info = reader.readLine();
+			input.close();
+			streamReader.close();
+			reader.close();
+
+			File writeTo = new File(stationsDir + "/" + d.getId() + ".station");
+			FileWriter writer = new FileWriter(writeTo);
+			writer.write(info);
+			writer.flush();
+			writer.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		try {
+			JsonObject json = new JsonParser().parse(info).getAsJsonObject();
+			d.setAltitude(json.get("altitude").getAsDouble());
+			d.setLatitude(json.get("latitude").getAsDouble());
+			d.setLongitude(json.get("longitude").getAsDouble());
+			d.setActive(json.get("active").getAsBoolean());
+			d.setCluster(json.get("cluster").getAsString());
+			d.setCountry(json.get("country").getAsString());
+			d.setSubcluster(json.get("subcluster").getAsString());
+			System.out.println(json.get("latitude").getAsDouble());
+		} catch (Exception e) {
+			Console.logError("The station " + d.getId() + " has invalid data! [WEB]");
+			//e.printStackTrace();
+		}
+
+	}
+
+	public static void setDetectorInfo(Detector d, String source) {
+		try {
+			JsonObject json = new JsonParser().parse(source).getAsJsonObject();
+			d.setAltitude(json.get("altitude").getAsDouble());
+			d.setLatitude(json.get("latitude").getAsDouble());
+			d.setLongitude(json.get("longitude").getAsDouble());
+			d.setActive(json.get("active").getAsBoolean());
+			d.setCluster(json.get("cluster").getAsString());
+			d.setCountry(json.get("country").getAsString());
+			d.setSubcluster(json.get("subcluster").getAsString());
+		} catch (Exception e) {
+			Console.logError("The station " + d.getId() + " has invalid data! [FILE]");
+			// e.printStackTrace();
+		}
+	}
+
+	public static void loadExtra() {
+		Thread dl = new Thread(new Runnable() {
+			@Override
+			public void run() {
+				for (int j = 0; j < InfoUtils.detectors.size(); j ++) {
+					//Calls the line causing the crash in getDetectorForID();
+					InfoUtils.setDetectorInfo(InfoUtils.getDetectorForID(j));
+					System.out.println(InfoUtils.getDetectorForID(j).getLatitude());
+				}
+				
+			}
+		});
+
+		if (!stationsDir.exists()) {
+			stationsDir.mkdirs();
+			dl.start();
+			try{
+				dl.join();
+			}
+			catch(Exception e){
+				e.printStackTrace();
+			}
+			return;
+		}
+		
+		int failCount = 0;
+		for (Detector d : detectors) {
+			File stationFile = new File(stationsDir + "/" + d.getId() + ".station");
+			if (stationFile.exists()) {
+				try {
+					FileReader reader = new FileReader(stationFile);
+					BufferedReader br = new BufferedReader(reader);
+					setDetectorInfo(d, br.readLine());
+					reader.close();
+					br.close();
+				} catch (Exception ex) {
+					Console.logError("Some error occured while loading station data");
+					ex.printStackTrace();
+				}
+			}
+			else{
+				failCount ++;
+			}
+			if(failCount >= 3){
+				dl.start();
+				Console.logError("Missing at least 3 station files!\r\nDownloading...");
+				try{
+					dl.join();
+				}
+				catch(Exception e){
+					e.printStackTrace();
+				}
+				return;
+			}
+				
+		}
+		
+		//dl.start();
+
+	}
+
+}

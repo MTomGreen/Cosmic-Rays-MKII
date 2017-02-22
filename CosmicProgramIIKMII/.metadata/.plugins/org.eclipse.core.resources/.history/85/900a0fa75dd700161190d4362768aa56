@@ -1,0 +1,24 @@
+package green;
+
+import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
+
+import green.thread.GUIThread;
+import green.thread.LoadThread;
+import green.thread.MainThread;
+
+public class CosmicRays {
+	
+	public static GUIThread guiThread;
+	public static MainThread mainThread;
+	
+	public static void main(String[] args) throws IOException {
+		
+		guiThread = new GUIThread();
+		mainThread = new MainThread();
+		new LoadThread().start();
+		mainThread.start();
+		guiThread.start();
+	}
+
+}

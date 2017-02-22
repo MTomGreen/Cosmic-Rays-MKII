@@ -1,0 +1,27 @@
+package green;
+
+import java.io.IOException;
+
+import green.thread.GUIThread;
+import green.thread.MainThread;
+
+public class CosmicRays {
+	
+	public static GUIThread guiThread;
+	public static MainThread mainThread;
+	
+	public static void main(String[] args) throws IOException {
+		
+		guiThread = new GUIThread();
+		mainThread = new MainThread();
+		mainThread.start();
+		try {
+			Thread.sleep(300);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		guiThread.start();
+	}
+
+}

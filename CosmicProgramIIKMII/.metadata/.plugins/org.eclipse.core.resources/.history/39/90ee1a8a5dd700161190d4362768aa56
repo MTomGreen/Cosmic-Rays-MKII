@@ -1,0 +1,12 @@
+package green.thread;
+
+public class LoadThread extends Thread{
+	
+	@Override
+	public void run() {
+		while(true){
+			
+		}
+	}
+
+}

@@ -1,0 +1,32 @@
+package green.ui.loadingWindow;
+
+import java.awt.Dimension;
+import java.awt.Toolkit;
+
+import javax.swing.JFrame;
+import javax.swing.SpringLayout;
+
+public class LoadingWindow extends JFrame {
+
+	private static final long serialVersionUID = -1578526379849467293L;
+	
+	public LoadingWindow() {
+		Dimension d =  Toolkit.getDefaultToolkit().getScreenSize();
+		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		setResizable(false);
+		setUndecorated(true);
+		setSize(478,269);
+		setLocation(d.width/2-getWidth()/2, d.height/2-getHeight()/2);
+		SpringLayout springLayout = new SpringLayout();
+		getContentPane().setLayout(springLayout);
+		
+		LoadPanel panel = new LoadPanel();
+		SpringLayout springLayout_1 = (SpringLayout) panel.getLayout();
+		springLayout.putConstraint(SpringLayout.NORTH, panel, 0, SpringLayout.NORTH, getContentPane());
+		springLayout.putConstraint(SpringLayout.WEST, panel, 0, SpringLayout.WEST, getContentPane());
+		springLayout.putConstraint(SpringLayout.SOUTH, panel, 0, SpringLayout.SOUTH, getContentPane());
+		springLayout.putConstraint(SpringLayout.EAST, panel, 0, SpringLayout.EAST, getContentPane());
+		getContentPane().add(panel);
+		setVisible(true);
+	}
+}
