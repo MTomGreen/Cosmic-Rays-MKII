@@ -490,7 +490,7 @@ public class Calculator extends JPanel implements CoincidenceReceiver {
 		Console.log("Received data at calculator!");
 		info = data;
 		isWaiting = false;
-		textField.setText("1");
+		textField.setText(info.size() > 0 ? "1" : "No coincidences found");
 		eventNo = 1;
 		loadLabelsFor(1);
 	}

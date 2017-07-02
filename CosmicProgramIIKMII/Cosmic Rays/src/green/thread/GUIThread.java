@@ -24,7 +24,7 @@ public class GUIThread extends Thread {
 		loadWindow.setVisible(true);
 		
 		
-		if((boolean)InfoUtils.getConfigValueOf("useConsole", true)){
+		if((boolean)InfoUtils.getConfigValueOf("useConsole", false)){
 			Console.log("Creating console");
 			con = new ConsoleWindow();
 			con.setTitle("Console");

@@ -169,11 +169,13 @@ public class Maths {
 		ArrayList<HashMap<String, Object>> returns = new ArrayList<HashMap<String, Object>>();
 
 		for (Coincidence con : InfoUtils.getCoincidences(stations, null, start, end, (int) InfoUtils.getConfigValueOf("defNoStrikes", 3))) {
-			HashMap<String, Object> ret = getAnglesFor(con);
-			double azimuth = (double)ret.get("azimuth");
-			System.err.println(azimuth);
-			if(!Double.isNaN(azimuth)){
+			if(con.rawData.size() > 0) {
+				HashMap<String, Object> ret = getAnglesFor(con);
+				double azimuth = (double)ret.get("azimuth");
+				System.err.println(azimuth);
+				if(!Double.isNaN(azimuth)){
 				returns.add(ret);
+				}
 			}
 		}
 
